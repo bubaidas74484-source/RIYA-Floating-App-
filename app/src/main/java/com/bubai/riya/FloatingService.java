@@ -15,6 +15,7 @@ import android.view.WindowManager;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.ImageView;
+import android.widget.Toast;
 
 public class FloatingService extends Service {
 
@@ -82,6 +83,7 @@ public class FloatingService extends Service {
                     return true;
 
                 case MotionEvent.ACTION_UP:
+                    Toast.makeText(FloatingService.this, "RIYA Tap Event Detected!", Toast.LENGTH_SHORT).show();
                     float dx = event.getRawX() - touchX;
                     float dy = event.getRawY() - touchY;
                     if (Math.abs(dx) < 60 && Math.abs(dy) < 60) {
