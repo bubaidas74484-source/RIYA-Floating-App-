@@ -17,6 +17,9 @@ import android.widget.RadioGroup;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Build;
+import android.view.View;
+import android.view.WindowInsets;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.inputmethod.InputMethodManager;
@@ -56,6 +59,9 @@ public class MainActivity extends Activity {
         getWindow().setStatusBarColor(Color.rgb(15, 17, 38));
         getWindow().setNavigationBarColor(Color.rgb(15, 17, 38));
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        if (Build.VERSION.SDK_INT >= 30) {
+            getWindow().setDecorFitsSystemWindows(false);
+        }
 
         voiceEnabled = getSharedPreferences("riya_settings", MODE_PRIVATE)
                 .getBoolean("voice_enabled", true);
@@ -65,6 +71,17 @@ public class MainActivity extends Activity {
         layout.setPadding(16, 12, 16, 10);
         layout.setBackgroundColor(Color.rgb(15, 17, 38));
         layout.setFocusableInTouchMode(true);
+
+        if (Build.VERSION.SDK_INT >= 30) {
+            layout.setOnApplyWindowInsetsListener((view, insets) -> {
+                int top = insets.getInsets(WindowInsets.Type.statusBars()).top;
+                int nav = insets.getInsets(WindowInsets.Type.navigationBars()).bottom;
+                int ime = insets.getInsets(WindowInsets.Type.ime()).bottom;
+                view.setPadding(dp(16), top + dp(12), dp(16),
+                        dp(10) + Math.max(nav, ime));
+                return insets;
+            });
+        }
 
         TextView title = new TextView(this);
         title.setText("RIYA  ♥\\nBUBAI AI COMPANION");
@@ -135,8 +152,8 @@ public class MainActivity extends Activity {
         LinearLayout inputRow = new LinearLayout(this);
         inputRow.setOrientation(LinearLayout.HORIZONTAL);
         inputRow.setGravity(Gravity.CENTER_VERTICAL);
-        inputRow.setPadding(4, 6, 4, 6);
-        inputRow.setBackground(roundBg(0xFF292542, 24));
+        inputRow.setPadding(8, 5, 8, 5);
+        inputRow.setBackground(roundBg(0xFF292542, 28));
 
         messageInput = new EditText(this);
         messageInput.setSingleLine(false);
@@ -145,9 +162,9 @@ public class MainActivity extends Activity {
         messageInput.setTextColor(Color.WHITE);
         messageInput.setHintTextColor(0xFFB8B3CC);
         messageInput.setHint("এখানে মেসেজ লেখো...");
-        messageInput.setPadding(12, 10, 12, 10);
-        messageInput.setMinHeight(dp(48));
-        messageInput.setBackground(roundBg(0xFF393550, 18));
+        messageInput.setPadding(14, 10, 8, 10);
+        messageInput.setMinHeight(dp(46));
+        messageInput.setBackgroundColor(Color.TRANSPARENT);
         messageInput.setImeOptions(EditorInfo.IME_ACTION_SEND);
 
         LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(
@@ -155,17 +172,17 @@ public class MainActivity extends Activity {
         inputParams.setMargins(dp(3), dp(2), dp(5), dp(2));
         inputRow.addView(messageInput, inputParams);
 
-        micButton = makeButton("🎙", 0xFF6846A5);
+        micButton = makeButton("🎙", Color.TRANSPARENT);
         micButton.setOnClickListener(v -> startVoiceInput());
         styleInputButton(micButton);
-        LinearLayout.LayoutParams micParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+        LinearLayout.LayoutParams micParams = new LinearLayout.LayoutParams(dp(38), dp(42));
         micParams.setMargins(dp(3), dp(2), dp(4), dp(2));
         inputRow.addView(micButton, micParams);
 
-        sendButton = makeButton("➤", 0xFFB04D91);
-        sendButton.setTextSize(20);
+        sendButton = makeButton("➤", Color.TRANSPARENT);
+        sendButton.setTextSize(23);
         styleInputButton(sendButton);
-        LinearLayout.LayoutParams sendParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+        LinearLayout.LayoutParams sendParams = new LinearLayout.LayoutParams(dp(38), dp(42));
         sendParams.setMargins(dp(3), dp(2), dp(3), dp(2));
         inputRow.addView(sendButton, sendParams);
 
@@ -185,10 +202,13 @@ public class MainActivity extends Activity {
         button.setMinWidth(0);
         button.setMinimumWidth(0);
         button.setMinHeight(0);
+        button.setMinimumHeight(0);
         button.setPadding(0, 0, 0, 0);
         button.setGravity(Gravity.CENTER);
-        button.setBackground(roundBg(
-                button == micButton ? 0xFF6846A5 : 0xFFB04D91, 50));
+        button.setTextColor(Color.WHITE);
+        button.setBackgroundColor(Color.TRANSPARENT);
+        button.setElevation(0);
+        button.setStateListAnimator(null);
     }
 
     private GradientDrawable roundBg(int color, int radius) {
@@ -256,7 +276,7 @@ public class MainActivity extends Activity {
 
         speechRecognizer.setRecognitionListener(new RecognitionListener() {
             @Override public void onReadyForSpeech(Bundle params) {
-                runOnUiThread(() -> micButton.setText("🎙 শুনছি..."));
+                runOnUiThread(() -> micButton.setText("🎙"));
             }
             @Override public void onResults(Bundle results) {
                 java.util.ArrayList<String> matches =
@@ -394,7 +414,7 @@ public class MainActivity extends Activity {
                 if (connection != null) connection.disconnect();
                 runOnUiThread(() -> {
                     sendButton.setEnabled(true);
-                    sendButton.setText("পাঠাও");
+                    sendButton.setText("➤");
                 });
             }
         }).start();
