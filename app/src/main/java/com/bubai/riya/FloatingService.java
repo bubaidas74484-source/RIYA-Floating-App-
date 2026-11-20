@@ -39,7 +39,7 @@ public class FloatingService extends Service {
         panel.setBackgroundColor(Color.rgb(255, 225, 239));
 
         ImageView avatar = new ImageView(this);
-        avatar.setImageResource(R.drawable.riya_avatar);
+        avatar.setImageResource(R.drawable.riya_sleeping);
         avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
 
         LinearLayout.LayoutParams imageParams =
@@ -87,17 +87,12 @@ public class FloatingService extends Service {
                     float dy = event.getRawY() - touchY;
                     if (Math.abs(dx) < 60 && Math.abs(dy) < 60) {
                         awake = !awake;
+                        avatar.setImageResource(awake
+                                ? R.drawable.riya_awake
+                                : R.drawable.riya_sleeping);
                         status.setText(awake
                                 ? "RIYA • Awake ✨"
                                 : "RIYA • Sleeping 💤");
-                        status.invalidate();
-                        Toast.makeText(FloatingService.this,
-                                awake ? "RIYA is AWAKE!" : "RIYA is SLEEPING!",
-                                Toast.LENGTH_SHORT).show();
-                    } else {
-                        Toast.makeText(FloatingService.this,
-                                "Movement: " + (int)dx + ", " + (int)dy,
-                                Toast.LENGTH_SHORT).show();
                     }
                     return true;
 
