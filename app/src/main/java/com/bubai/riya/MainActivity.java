@@ -138,10 +138,6 @@ public class MainActivity extends Activity {
         inputRow.setPadding(8, 8, 8, 8);
         inputRow.setBackground(roundBg(0xFF292542, 24));
 
-        micButton = makeButton("🎙", 0xFF6846A5);
-        micButton.setOnClickListener(v -> startVoiceInput());
-        inputRow.addView(micButton);
-
         messageInput = new EditText(this);
         messageInput.setSingleLine(false);
         messageInput.setMaxLines(4);
@@ -155,7 +151,11 @@ public class MainActivity extends Activity {
         inputRow.addView(messageInput, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
 
-        sendButton = makeButton("পাঠাও ➤", 0xFFB04D91);
+        micButton = makeButton("🎙", 0xFF6846A5);
+        micButton.setOnClickListener(v -> startVoiceInput());
+        inputRow.addView(micButton);
+
+        sendButton = makeButton("➤", 0xFFB04D91);
         inputRow.addView(sendButton);
         layout.addView(inputRow);
 
