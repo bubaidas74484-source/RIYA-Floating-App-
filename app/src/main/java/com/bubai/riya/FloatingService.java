@@ -2,6 +2,12 @@ package com.bubai.riya;
 
 import android.app.Service;
 import android.content.Intent;
+import android.content.BroadcastReceiver;
+import android.content.IntentFilter;
+import android.content.Context;
+import android.os.Build;
+import android.speech.tts.TextToSpeech;
+import java.util.Locale;
 import android.graphics.PixelFormat;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -23,6 +29,10 @@ public class FloatingService extends Service {
     private View floatingView;
     private WindowManager.LayoutParams params;
     private boolean awake = false;
+    private TextToSpeech textToSpeech;
+    private boolean ttsReady = false;
+    private String pendingReply;
+    private BroadcastReceiver speechReceiver;
     private float touchX, touchY;
     private int startX, startY;
 
@@ -58,6 +68,43 @@ public class FloatingService extends Service {
         status.setGravity(Gravity.CENTER);
         status.setPadding(4, 8, 4, 2);
         panel.addView(status);
+
+        textToSpeech = new TextToSpeech(this, result -> {
+            if (result == TextToSpeech.SUCCESS) {
+                int language = textToSpeech.setLanguage(new Locale("bn", "BD"));
+                if (language == TextToSpeech.LANG_MISSING_DATA ||
+                        language == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    language = textToSpeech.setLanguage(new Locale("bn", "IN"));
+                }
+                ttsReady = language != TextToSpeech.LANG_MISSING_DATA &&
+                        language != TextToSpeech.LANG_NOT_SUPPORTED;
+                if (ttsReady) speakPendingReply();
+                else status.setText("RIYA • বাংলা Voice পাওয়া যায়নি");
+            } else {
+                status.setText("RIYA • Voice চালু হয়নি");
+            }
+        });
+
+        speechReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String reply = intent.getStringExtra("reply");
+                if (reply == null || reply.trim().isEmpty()) return;
+
+                awake = true;
+                avatar.setImageResource(R.drawable.riya_awake);
+                status.setText("RIYA • কথা বলছে 🗣️");
+                pendingReply = reply;
+                speakPendingReply();
+            }
+        };
+
+        IntentFilter speechFilter = new IntentFilter("com.bubai.riya.SPEAK_REPLY");
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(speechReceiver, speechFilter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(speechReceiver, speechFilter);
+        }
 
         floatingView = panel;
 
@@ -166,8 +213,28 @@ public class FloatingService extends Service {
         windowManager.addView(floatingView, params);
     }
 
+    private void speakPendingReply() {
+        if (!ttsReady || textToSpeech == null || pendingReply == null) return;
+        textToSpeech.speak(
+                pendingReply,
+                TextToSpeech.QUEUE_FLUSH,
+                null,
+                "RIYA_REPLY"
+        );
+        pendingReply = null;
+    }
+
     @Override
     public void onDestroy() {
+        if (speechReceiver != null) {
+            unregisterReceiver(speechReceiver);
+            speechReceiver = null;
+        }
+        if (textToSpeech != null) {
+            textToSpeech.stop();
+            textToSpeech.shutdown();
+            textToSpeech = null;
+        }
         super.onDestroy();
         if (floatingView != null && windowManager != null) {
             windowManager.removeView(floatingView);

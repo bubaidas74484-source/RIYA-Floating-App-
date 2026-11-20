@@ -189,7 +189,13 @@ public class MainActivity extends Activity {
                         ? result.optString("message", "বুবাই, উত্তরটা বুঝতে পারিনি।")
                         : "বুবাই, সার্ভারের উত্তর ঠিকমতো পাওয়া যায়নি।";
 
-                runOnUiThread(() -> addMessage("RIYA ❤️", reply));
+                runOnUiThread(() -> {
+                    addMessage("RIYA ❤️", reply);
+                    Intent speechIntent = new Intent("com.bubai.riya.SPEAK_REPLY");
+                    speechIntent.setPackage(getPackageName());
+                    speechIntent.putExtra("reply", reply);
+                    sendBroadcast(speechIntent);
+                });
 
             } catch (Exception error) {
                 runOnUiThread(() -> addMessage("RIYA",
