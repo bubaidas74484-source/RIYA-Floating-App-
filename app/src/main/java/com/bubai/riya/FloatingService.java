@@ -7,6 +7,7 @@ import android.content.IntentFilter;
 import android.content.Context;
 import android.os.Build;
 import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import java.util.Locale;
 import android.graphics.PixelFormat;
 import android.graphics.Color;
@@ -95,6 +96,39 @@ public class FloatingService extends Service {
                 } else status.setText("RIYA • বাংলা Voice পাওয়া যায়নি");
             } else {
                 status.setText("RIYA • Voice চালু হয়নি");
+            }
+        });
+
+        textToSpeech.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+            @Override
+            public void onStart(String utteranceId) {
+                if ("RIYA_REPLY".equals(utteranceId)) {
+                    new android.os.Handler(getMainLooper()).post(() -> {
+                        status.setText("RIYA • কথা বলছে 🗣️");
+                        avatar.animate().scaleX(1.025f).scaleY(1.025f)
+                                .setDuration(180).start();
+                    });
+                }
+            }
+
+            @Override
+            public void onDone(String utteranceId) {
+                if ("RIYA_REPLY".equals(utteranceId)) {
+                    new android.os.Handler(getMainLooper()).post(() -> {
+                        avatar.animate().scaleX(1f).scaleY(1f)
+                                .setDuration(220).start();
+                        status.setText(awake ? "RIYA • Awake ✨" : "RIYA • Sleeping 💤");
+                    });
+                }
+            }
+
+            @Override
+            public void onError(String utteranceId) {
+                if ("RIYA_REPLY".equals(utteranceId)) {
+                    new android.os.Handler(getMainLooper()).post(() -> {
+                        avatar.animate().scaleX(1f).scaleY(1f).start();
+                    });
+                }
             }
         });
 
