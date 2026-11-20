@@ -72,7 +72,7 @@ public class FloatingService extends Service {
         params.x = 20;
         params.y = 250;
 
-        panel.setOnTouchListener((view, event) -> {
+        View.OnTouchListener touchListener = (view, event) -> {
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
                     touchX = event.getRawX();
@@ -84,8 +84,7 @@ public class FloatingService extends Service {
                 case MotionEvent.ACTION_UP:
                     float dx = event.getRawX() - touchX;
                     float dy = event.getRawY() - touchY;
-
-                    if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+                    if (Math.abs(dx) < 15 && Math.abs(dy) < 15) {
                         awake = !awake;
                         status.setText(awake
                                 ? "RIYA • Awake ✨"
@@ -99,8 +98,12 @@ public class FloatingService extends Service {
                     windowManager.updateViewLayout(floatingView, params);
                     return true;
             }
-            return false;
-        });
+            return true;
+        };
+
+        panel.setOnTouchListener(touchListener);
+        avatar.setOnTouchListener(touchListener);
+        status.setOnTouchListener(touchListener);
 
         windowManager.addView(floatingView, params);
     }
