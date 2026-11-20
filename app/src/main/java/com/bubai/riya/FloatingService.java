@@ -84,7 +84,7 @@ public class FloatingService extends Service {
                 case MotionEvent.ACTION_UP:
                     float dx = event.getRawX() - touchX;
                     float dy = event.getRawY() - touchY;
-                    if (Math.abs(dx) < 15 && Math.abs(dy) < 15) {
+                    if (Math.abs(dx) < 60 && Math.abs(dy) < 60) {
                         awake = !awake;
                         status.setText(awake
                                 ? "RIYA • Awake ✨"
