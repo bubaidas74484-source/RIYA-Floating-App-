@@ -1,6 +1,10 @@
 package com.bubai.riya;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.widget.ArrayAdapter;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -13,6 +17,7 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.json.JSONObject;
 
@@ -45,6 +50,11 @@ public class MainActivity extends Activity {
         title.setGravity(Gravity.CENTER);
         title.setPadding(0, 12, 0, 20);
         layout.addView(title);
+
+        Button settingsButton = new Button(this);
+        settingsButton.setText("⚙️ Settings");
+        settingsButton.setOnClickListener(v -> showTokenSettings());
+        layout.addView(settingsButton);
 
         LinearLayout controls = new LinearLayout(this);
         controls.setOrientation(LinearLayout.HORIZONTAL);
@@ -191,6 +201,106 @@ public class MainActivity extends Activity {
                     sendButton.setEnabled(true);
                     sendButton.setText("পাঠাও");
                 });
+            }
+        }).start();
+    }
+
+
+    private void showTokenSettings() {
+        new Thread(() -> {
+            HttpURLConnection connection = null;
+            try {
+                URL url = new URL("http://127.0.0.1:8765/api/riya/settings");
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("GET");
+                connection.setConnectTimeout(10000);
+                connection.setReadTimeout(10000);
+
+                StringBuilder response = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(connection.getInputStream(), "UTF-8"))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) response.append(line);
+                }
+
+                int current = new JSONObject(response.toString())
+                        .optInt("max_output_tokens", 500);
+                runOnUiThread(() -> showTokenDialog(current));
+
+            } catch (Exception error) {
+                runOnUiThread(() -> Toast.makeText(this,
+                        "বুবাই, Settings লোড হয়নি। BUBAI Server চালু আছে কি না দেখো।",
+                        Toast.LENGTH_LONG).show());
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+        }).start();
+    }
+
+    private void showTokenDialog(int current) {
+        int[] values = {200, 400, 500, 700, 1000};
+        RadioGroup group = new RadioGroup(this);
+        group.setOrientation(RadioGroup.VERTICAL);
+        group.setPadding(40, 20, 40, 20);
+
+        for (int value : values) {
+            RadioButton option = new RadioButton(this);
+            option.setId(value);
+            option.setText(value + " tokens");
+            option.setTextSize(17);
+            group.addView(option);
+        }
+
+        group.check(current);
+        new AlertDialog.Builder(this)
+                .setTitle("RIYA Response Length")
+                .setMessage("RIYA-র উত্তরের দৈর্ঘ্য বেছে নাও")
+                .setView(group)
+                .setPositiveButton("Save", (dialog, which) -> {
+                    int selected = group.getCheckedRadioButtonId();
+                    if (selected == -1) selected = 500;
+                    saveTokenLimit(selected);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void saveTokenLimit(int value) {
+        new Thread(() -> {
+            HttpURLConnection connection = null;
+            try {
+                URL url = new URL("http://127.0.0.1:8765/api/riya/settings");
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("POST");
+                connection.setConnectTimeout(10000);
+                connection.setReadTimeout(10000);
+                connection.setDoOutput(true);
+                connection.setRequestProperty("Content-Type",
+                        "application/json; charset=UTF-8");
+
+                JSONObject request = new JSONObject();
+                request.put("max_output_tokens", value);
+                byte[] body = request.toString().getBytes("UTF-8");
+
+                try (OutputStream output = connection.getOutputStream()) {
+                    output.write(body);
+                }
+
+                int status = connection.getResponseCode();
+                if (status < 200 || status >= 300) {
+                    throw new Exception("HTTP " + status);
+                }
+
+                runOnUiThread(() -> Toast.makeText(this,
+                        "RIYA Settings saved: " + value + " tokens ❤️",
+                        Toast.LENGTH_LONG).show());
+
+            } catch (Exception error) {
+                runOnUiThread(() -> Toast.makeText(this,
+                        "Settings save হয়নি। Server connection পরীক্ষা করো।",
+                        Toast.LENGTH_LONG).show());
+            } finally {
+                if (connection != null) connection.disconnect();
             }
         }).start();
     }
