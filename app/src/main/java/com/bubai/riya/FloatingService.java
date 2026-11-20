@@ -3,15 +3,18 @@ package com.bubai.riya;
 import android.app.Service;
 import android.content.Intent;
 import android.graphics.PixelFormat;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.Outline;
 import android.os.IBinder;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewOutlineProvider;
 import android.view.WindowManager;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import android.graphics.Color;
-import android.graphics.Typeface;
+import android.widget.ImageView;
 
 public class FloatingService extends Service {
 
@@ -31,21 +34,28 @@ public class FloatingService extends Service {
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setGravity(Gravity.CENTER);
-        panel.setPadding(14, 12, 14, 12);
+        panel.setPadding(10, 10, 10, 10);
         panel.setBackgroundColor(Color.rgb(255, 225, 239));
 
-        TextView avatar = new TextView(this);
-        avatar.setText("💗\n👩🏻‍🦰\n💤");
-        avatar.setTextSize(30);
-        avatar.setGravity(Gravity.CENTER);
+        ImageView avatar = new ImageView(this);
+        avatar.setImageResource(R.drawable.riya_avatar);
+        avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
+
+        LinearLayout.LayoutParams imageParams =
+                new LinearLayout.LayoutParams(180, 180);
+        avatar.setLayoutParams(imageParams);
+        avatar.setClipToOutline(true);
+        avatar.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
+        avatar.setBackgroundColor(Color.WHITE);
         panel.addView(avatar);
 
         TextView status = new TextView(this);
-        status.setText("RIYA • Sleeping");
+        status.setText("RIYA • Sleeping 💤");
         status.setTextColor(Color.rgb(100, 40, 75));
         status.setTextSize(12);
         status.setTypeface(null, Typeface.BOLD);
         status.setGravity(Gravity.CENTER);
+        status.setPadding(4, 8, 4, 2);
         panel.addView(status);
 
         floatingView = panel;
@@ -77,8 +87,9 @@ public class FloatingService extends Service {
 
                     if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
                         awake = !awake;
-                        avatar.setText(awake ? "💗\n😊\n✨" : "💗\n👩🏻‍🦰\n💤");
-                        status.setText(awake ? "RIYA • Awake" : "RIYA • Sleeping");
+                        status.setText(awake
+                                ? "RIYA • Awake ✨"
+                                : "RIYA • Sleeping 💤");
                     }
                     return true;
 
