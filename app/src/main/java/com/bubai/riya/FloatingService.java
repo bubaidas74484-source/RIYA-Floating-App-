@@ -83,7 +83,6 @@ public class FloatingService extends Service {
                     return true;
 
                 case MotionEvent.ACTION_UP:
-                    Toast.makeText(FloatingService.this, "RIYA Tap Event Detected!", Toast.LENGTH_SHORT).show();
                     float dx = event.getRawX() - touchX;
                     float dy = event.getRawY() - touchY;
                     if (Math.abs(dx) < 60 && Math.abs(dy) < 60) {
@@ -91,6 +90,14 @@ public class FloatingService extends Service {
                         status.setText(awake
                                 ? "RIYA • Awake ✨"
                                 : "RIYA • Sleeping 💤");
+                        status.invalidate();
+                        Toast.makeText(FloatingService.this,
+                                awake ? "RIYA is AWAKE!" : "RIYA is SLEEPING!",
+                                Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(FloatingService.this,
+                                "Movement: " + (int)dx + ", " + (int)dy,
+                                Toast.LENGTH_SHORT).show();
                     }
                     return true;
 
