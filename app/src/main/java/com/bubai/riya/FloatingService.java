@@ -223,12 +223,19 @@ public class FloatingService extends Service {
 
     private void speakPendingReply() {
         if (!ttsReady || textToSpeech == null || pendingReply == null) return;
-        textToSpeech.speak(
-                pendingReply,
-                TextToSpeech.QUEUE_FLUSH,
-                null,
-                "RIYA_REPLY"
-        );
+        String speechText = pendingReply
+                .replaceAll("[\\p{So}\\p{Sk}\\uFE0F\\u200D\\u20E3]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+
+        if (!speechText.isEmpty()) {
+            textToSpeech.speak(
+                    speechText,
+                    TextToSpeech.QUEUE_FLUSH,
+                    null,
+                    "RIYA_REPLY"
+            );
+        }
         pendingReply = null;
     }
 
