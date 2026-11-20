@@ -40,10 +40,10 @@ public class FloatingService extends Service {
 
         ImageView avatar = new ImageView(this);
         avatar.setImageResource(R.drawable.riya_sleeping);
-        avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        avatar.setScaleType(ImageView.ScaleType.FIT_CENTER);
 
         LinearLayout.LayoutParams imageParams =
-                new LinearLayout.LayoutParams(180, 180);
+                new LinearLayout.LayoutParams(240, 394);
         avatar.setLayoutParams(imageParams);
         avatar.setClipToOutline(true);
         avatar.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
