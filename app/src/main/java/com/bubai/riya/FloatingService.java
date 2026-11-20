@@ -73,19 +73,78 @@ public class FloatingService extends Service {
         params.x = 20;
         params.y = 250;
 
+        float[] initialSpan = {0f};
+        int[] baseWidth = {240};
+        int[] baseHeight = {394};
+        float[] baseTextSize = {12f};
+        boolean[] pinching = {false};
+
         View.OnTouchListener touchListener = (view, event) -> {
-            switch (event.getAction()) {
+            switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
                     touchX = event.getRawX();
                     touchY = event.getRawY();
                     startX = params.x;
                     startY = params.y;
+                    pinching[0] = false;
+                    return true;
+
+                case MotionEvent.ACTION_POINTER_DOWN:
+                    if (event.getPointerCount() >= 2) {
+                        float x = event.getX(0) - event.getX(1);
+                        float y = event.getY(0) - event.getY(1);
+                        initialSpan[0] = (float) Math.hypot(x, y);
+
+                        LinearLayout.LayoutParams lp =
+                                (LinearLayout.LayoutParams) avatar.getLayoutParams();
+                        baseWidth[0] = lp.width;
+                        baseHeight[0] = lp.height;
+                        baseTextSize[0] = status.getTextSize() /
+                                getResources().getDisplayMetrics().scaledDensity;
+                        pinching[0] = true;
+                    }
+                    return true;
+
+                case MotionEvent.ACTION_MOVE:
+                    if (event.getPointerCount() >= 2 && initialSpan[0] > 0) {
+                        pinching[0] = true;
+                        float x = event.getX(0) - event.getX(1);
+                        float y = event.getY(0) - event.getY(1);
+                        float currentSpan = (float) Math.hypot(x, y);
+                        float scale = currentSpan / initialSpan[0];
+                        scale = Math.max(0.65f, Math.min(scale, 1.8f));
+
+                        int newWidth = Math.round(baseWidth[0] * scale);
+                        int newHeight = Math.round(baseHeight[0] * scale);
+
+                        LinearLayout.LayoutParams lp =
+                                (LinearLayout.LayoutParams) avatar.getLayoutParams();
+                        lp.width = newWidth;
+                        lp.height = newHeight;
+                        avatar.setLayoutParams(lp);
+
+                        status.setTextSize(baseTextSize[0] * scale);
+                        int pad = Math.round(10 * scale);
+                        panel.setPadding(pad, pad, pad, pad);
+
+                        params.width = WindowManager.LayoutParams.WRAP_CONTENT;
+                        params.height = WindowManager.LayoutParams.WRAP_CONTENT;
+                        windowManager.updateViewLayout(floatingView, params);
+                    } else if (event.getPointerCount() == 1 && !pinching[0]) {
+                        params.x = startX + (int)(event.getRawX() - touchX);
+                        params.y = startY + (int)(event.getRawY() - touchY);
+                        windowManager.updateViewLayout(floatingView, params);
+                    }
+                    return true;
+
+                case MotionEvent.ACTION_POINTER_UP:
+                    pinching[0] = true;
                     return true;
 
                 case MotionEvent.ACTION_UP:
                     float dx = event.getRawX() - touchX;
                     float dy = event.getRawY() - touchY;
-                    if (Math.abs(dx) < 60 && Math.abs(dy) < 60) {
+                    if (!pinching[0] && Math.abs(dx) < 60 && Math.abs(dy) < 60) {
                         awake = !awake;
                         avatar.setImageResource(awake
                                 ? R.drawable.riya_awake
@@ -94,17 +153,12 @@ public class FloatingService extends Service {
                                 ? "RIYA • Awake ✨"
                                 : "RIYA • Sleeping 💤");
                     }
-                    return true;
-
-                case MotionEvent.ACTION_MOVE:
-                    params.x = startX + (int)(event.getRawX() - touchX);
-                    params.y = startY + (int)(event.getRawY() - touchY);
-                    windowManager.updateViewLayout(floatingView, params);
+                    initialSpan[0] = 0f;
+                    pinching[0] = false;
                     return true;
             }
             return true;
         };
-
         panel.setOnTouchListener(touchListener);
         avatar.setOnTouchListener(touchListener);
         status.setOnTouchListener(touchListener);
