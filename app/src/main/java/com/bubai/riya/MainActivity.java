@@ -135,7 +135,7 @@ public class MainActivity extends Activity {
         LinearLayout inputRow = new LinearLayout(this);
         inputRow.setOrientation(LinearLayout.HORIZONTAL);
         inputRow.setGravity(Gravity.CENTER_VERTICAL);
-        inputRow.setPadding(8, 8, 8, 8);
+        inputRow.setPadding(4, 6, 4, 6);
         inputRow.setBackground(roundBg(0xFF292542, 24));
 
         messageInput = new EditText(this);
@@ -145,24 +145,50 @@ public class MainActivity extends Activity {
         messageInput.setTextColor(Color.WHITE);
         messageInput.setHintTextColor(0xFFB8B3CC);
         messageInput.setHint("এখানে মেসেজ লেখো...");
-        messageInput.setPadding(14, 10, 14, 10);
+        messageInput.setPadding(12, 10, 12, 10);
+        messageInput.setMinHeight(dp(48));
         messageInput.setBackground(roundBg(0xFF393550, 18));
         messageInput.setImeOptions(EditorInfo.IME_ACTION_SEND);
-        inputRow.addView(messageInput, new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+        LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        inputParams.setMargins(dp(3), dp(2), dp(5), dp(2));
+        inputRow.addView(messageInput, inputParams);
 
         micButton = makeButton("🎙", 0xFF6846A5);
         micButton.setOnClickListener(v -> startVoiceInput());
-        inputRow.addView(micButton);
+        styleInputButton(micButton);
+        LinearLayout.LayoutParams micParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+        micParams.setMargins(dp(3), dp(2), dp(4), dp(2));
+        inputRow.addView(micButton, micParams);
 
         sendButton = makeButton("➤", 0xFFB04D91);
-        inputRow.addView(sendButton);
+        sendButton.setTextSize(20);
+        styleInputButton(sendButton);
+        LinearLayout.LayoutParams sendParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+        sendParams.setMargins(dp(3), dp(2), dp(3), dp(2));
+        inputRow.addView(sendButton, sendParams);
+
         layout.addView(inputRow);
 
         sendButton.setOnClickListener(v -> sendMessage());
 
         setContentView(layout);
         addMessage("RIYA ❤️", "হ্যালো বুবাই! ❤️ আমি এখানে আছি। আমার সঙ্গে কথা বলো।");
+    }
+
+    private int dp(int value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    private void styleInputButton(Button button) {
+        button.setMinWidth(0);
+        button.setMinimumWidth(0);
+        button.setMinHeight(0);
+        button.setPadding(0, 0, 0, 0);
+        button.setGravity(Gravity.CENTER);
+        button.setBackground(roundBg(
+                button == micButton ? 0xFF6846A5 : 0xFFB04D91, 50));
     }
 
     private GradientDrawable roundBg(int color, int radius) {
