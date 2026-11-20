@@ -71,15 +71,23 @@ public class FloatingService extends Service {
 
         textToSpeech = new TextToSpeech(this, result -> {
             if (result == TextToSpeech.SUCCESS) {
-                int language = textToSpeech.setLanguage(new Locale("bn", "BD"));
+                int language = textToSpeech.setLanguage(new Locale("bn", "IN"));
                 if (language == TextToSpeech.LANG_MISSING_DATA ||
                         language == TextToSpeech.LANG_NOT_SUPPORTED) {
-                    language = textToSpeech.setLanguage(new Locale("bn", "IN"));
+                    language = textToSpeech.setLanguage(new Locale("bn", "BD"));
                 }
                 ttsReady = language != TextToSpeech.LANG_MISSING_DATA &&
                         language != TextToSpeech.LANG_NOT_SUPPORTED;
-                if (ttsReady) speakPendingReply();
-                else status.setText("RIYA • বাংলা Voice পাওয়া যায়নি");
+                if (ttsReady) {
+                    StringBuilder voices = new StringBuilder("বাংলা Voices: ");
+                    for (android.speech.tts.Voice voice : textToSpeech.getVoices()) {
+                        if (voice.getLocale().getLanguage().equals("bn")) {
+                            voices.append(voice.getName()).append(" | ");
+                        }
+                    }
+                    status.setText(voices.length() > 15 ? voices.toString() : "RIYA • বাংলা Voice পাওয়া গেছে");
+                    speakPendingReply();
+                } else status.setText("RIYA • বাংলা Voice পাওয়া যায়নি");
             } else {
                 status.setText("RIYA • Voice চালু হয়নি");
             }
