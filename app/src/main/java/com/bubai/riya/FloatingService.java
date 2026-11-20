@@ -33,12 +33,17 @@ public class FloatingService extends Service {
     private boolean ttsReady = false;
     private String pendingReply;
     private BroadcastReceiver speechReceiver;
+    private boolean voiceEnabled = true;
+    private String lastSpokenReply;
     private float touchX, touchY;
     private int startX, startY;
 
     @Override
     public void onCreate() {
         super.onCreate();
+
+        voiceEnabled = getSharedPreferences("riya_settings", MODE_PRIVATE)
+                .getBoolean("voice_enabled", true);
 
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
 
@@ -96,18 +101,43 @@ public class FloatingService extends Service {
         speechReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
+                String action = intent.getAction();
+
+                if ("com.bubai.riya.SET_VOICE_ENABLED".equals(action)) {
+                    voiceEnabled = intent.getBooleanExtra("enabled", true);
+                    getSharedPreferences("riya_settings", MODE_PRIVATE)
+                            .edit().putBoolean("voice_enabled", voiceEnabled).apply();
+                    if (!voiceEnabled && textToSpeech != null) {
+                        textToSpeech.stop();
+                    }
+                    return;
+                }
+
+                if ("com.bubai.riya.REPLAY_LAST_REPLY".equals(action)) {
+                    if (lastSpokenReply != null) {
+                        pendingReply = lastSpokenReply;
+                        speakPendingReply();
+                    }
+                    return;
+                }
+
                 String reply = intent.getStringExtra("reply");
                 if (reply == null || reply.trim().isEmpty()) return;
 
                 awake = true;
                 avatar.setImageResource(R.drawable.riya_awake);
                 status.setText("RIYA • কথা বলছে 🗣️");
+                lastSpokenReply = reply;
                 pendingReply = reply;
                 speakPendingReply();
             }
         };
 
-        IntentFilter speechFilter = new IntentFilter("com.bubai.riya.SPEAK_REPLY");
+        IntentFilter speechFilter = new IntentFilter();
+        speechFilter.addAction("com.bubai.riya.SPEAK_REPLY");
+        speechFilter.addAction("com.bubai.riya.SET_VOICE_ENABLED");
+        speechFilter.addAction("com.bubai.riya.REPLAY_LAST_REPLY");
+
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(speechReceiver, speechFilter, Context.RECEIVER_NOT_EXPORTED);
         } else {
@@ -222,7 +252,7 @@ public class FloatingService extends Service {
     }
 
     private void speakPendingReply() {
-        if (!ttsReady || textToSpeech == null || pendingReply == null) return;
+        if (!voiceEnabled || !ttsReady || textToSpeech == null || pendingReply == null) return;
         String speechText = pendingReply
                 .replaceAll("[\\p{So}\\p{Sk}\\uFE0F\\u200D\\u20E3]", " ")
                 .replaceAll("\\s+", " ")

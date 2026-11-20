@@ -1,5 +1,14 @@
 package com.bubai.riya;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
+import android.speech.RecognizerIntent;
+import android.speech.RecognitionListener;
+import android.speech.SpeechRecognizer;
+import android.view.WindowManager;
+import android.view.inputmethod.EditorInfo;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.widget.ArrayAdapter;
@@ -35,52 +44,89 @@ public class MainActivity extends Activity {
     private ScrollView chatScroll;
     private EditText messageInput;
     private Button sendButton;
+    private Button micButton, voiceButton, replayButton;
+    private SpeechRecognizer speechRecognizer;
+    private boolean voiceEnabled = true;
+    private static final int MIC_PERMISSION = 2002;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        getWindow().setStatusBarColor(Color.rgb(15, 17, 38));
+        getWindow().setNavigationBarColor(Color.rgb(15, 17, 38));
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+
+        voiceEnabled = getSharedPreferences("riya_settings", MODE_PRIVATE)
+                .getBoolean("voice_enabled", true);
+
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(24, 24, 24, 16);
+        layout.setPadding(16, 12, 16, 10);
+        layout.setBackgroundColor(Color.rgb(15, 17, 38));
+        layout.setFocusableInTouchMode(true);
 
         TextView title = new TextView(this);
-        title.setText("RIYA ❤️\nBUBAI AI Companion");
-        title.setTextSize(25);
+        title.setText("RIYA  ♥\\nBUBAI AI COMPANION");
+        title.setTextSize(23);
+        title.setTextColor(Color.WHITE);
         title.setGravity(Gravity.CENTER);
-        title.setPadding(0, 12, 0, 20);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setPadding(8, 14, 8, 14);
+        title.setBackground(roundBg(0xFF29234F, 22));
         layout.addView(title);
 
-        Button settingsButton = new Button(this);
-        settingsButton.setText("⚙️ Settings");
+        LinearLayout topRow = new LinearLayout(this);
+        topRow.setGravity(Gravity.CENTER);
+        topRow.setOrientation(LinearLayout.HORIZONTAL);
+
+        Button settingsButton = makeButton("⚙ Settings", 0xFF39345F);
         settingsButton.setOnClickListener(v -> showTokenSettings());
-        layout.addView(settingsButton);
+        topRow.addView(settingsButton, weightedParams());
 
-        LinearLayout controls = new LinearLayout(this);
-        controls.setOrientation(LinearLayout.HORIZONTAL);
+        Button start = makeButton("☀ Wake RIYA", 0xFF6846A5);
+        start.setOnClickListener(v -> showRiya());
+        topRow.addView(start, weightedParams());
 
-        Button start = new Button(this);
-        start.setText("Wake RIYA");
-        controls.addView(start, new LinearLayout.LayoutParams(0,
-                LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        Button stop = makeButton("☾ Sleep", 0xFF39345F);
+        stop.setOnClickListener(v ->
+                stopService(new Intent(this, FloatingService.class)));
+        topRow.addView(stop, weightedParams());
+        layout.addView(topRow);
 
-        Button stop = new Button(this);
-        stop.setText("Let RIYA Sleep");
-        controls.addView(stop, new LinearLayout.LayoutParams(0,
-                LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        LinearLayout voiceRow = new LinearLayout(this);
+        voiceRow.setGravity(Gravity.CENTER);
+        voiceRow.setPadding(0, 8, 0, 8);
 
-        layout.addView(controls);
+        voiceButton = makeButton("", 0xFF39345F);
+        updateVoiceButton();
+        voiceButton.setOnClickListener(v -> toggleVoice());
+        voiceRow.addView(voiceButton, weightedParams());
+
+        replayButton = makeButton("↻ Listen Again", 0xFF6846A5);
+        replayButton.setOnClickListener(v -> {
+            Intent replay = new Intent("com.bubai.riya.REPLAY_LAST_REPLY");
+            replay.setPackage(getPackageName());
+            sendBroadcast(replay);
+            Toast.makeText(this, "শেষ উত্তরটি আবার শোনানোর চেষ্টা করছি ❤️",
+                    Toast.LENGTH_SHORT).show();
+        });
+        voiceRow.addView(replayButton, weightedParams());
+        layout.addView(voiceRow);
 
         TextView chatTitle = new TextView(this);
-        chatTitle.setText("💗 RIYA-র সঙ্গে কথা বলো");
-        chatTitle.setTextSize(19);
-        chatTitle.setPadding(4, 18, 4, 10);
+        chatTitle.setText("💜  RIYA-র সঙ্গে কথা বলো");
+        chatTitle.setTextSize(18);
+        chatTitle.setTextColor(0xFFFFD6EB);
+        chatTitle.setPadding(6, 12, 6, 10);
         layout.addView(chatTitle);
 
         chatScroll = new ScrollView(this);
+        chatScroll.setFillViewport(true);
+
         chatMessages = new LinearLayout(this);
         chatMessages.setOrientation(LinearLayout.VERTICAL);
-        chatMessages.setPadding(8, 8, 8, 8);
+        chatMessages.setPadding(8, 10, 8, 10);
         chatScroll.addView(chatMessages);
 
         layout.addView(chatScroll, new LinearLayout.LayoutParams(
@@ -89,37 +135,154 @@ public class MainActivity extends Activity {
         LinearLayout inputRow = new LinearLayout(this);
         inputRow.setOrientation(LinearLayout.HORIZONTAL);
         inputRow.setGravity(Gravity.CENTER_VERTICAL);
+        inputRow.setPadding(8, 8, 8, 8);
+        inputRow.setBackground(roundBg(0xFF292542, 24));
+
+        micButton = makeButton("🎙", 0xFF6846A5);
+        micButton.setOnClickListener(v -> startVoiceInput());
+        inputRow.addView(micButton);
 
         messageInput = new EditText(this);
-        messageInput.setSingleLine(true);
+        messageInput.setSingleLine(false);
+        messageInput.setMaxLines(4);
         messageInput.setTextSize(16);
+        messageInput.setTextColor(Color.WHITE);
+        messageInput.setHintTextColor(0xFFB8B3CC);
         messageInput.setHint("এখানে মেসেজ লেখো...");
-        inputRow.addView(messageInput, new LinearLayout.LayoutParams(0,
-                LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        messageInput.setPadding(14, 10, 14, 10);
+        messageInput.setBackground(roundBg(0xFF393550, 18));
+        messageInput.setImeOptions(EditorInfo.IME_ACTION_SEND);
+        inputRow.addView(messageInput, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
 
-        sendButton = new Button(this);
-        sendButton.setText("পাঠাও");
+        sendButton = makeButton("পাঠাও ➤", 0xFFB04D91);
         inputRow.addView(sendButton);
-
         layout.addView(inputRow);
-
-        start.setOnClickListener(v -> showRiya());
-        stop.setOnClickListener(v ->
-                stopService(new Intent(this, FloatingService.class)));
 
         sendButton.setOnClickListener(v -> sendMessage());
 
         setContentView(layout);
-        addMessage("RIYA", "হ্যালো বুবাই! ❤️ আমি এখানে আছি। আমার সঙ্গে কথা বলো।");
+        addMessage("RIYA ❤️", "হ্যালো বুবাই! ❤️ আমি এখানে আছি। আমার সঙ্গে কথা বলো।");
+    }
+
+    private GradientDrawable roundBg(int color, int radius) {
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(color);
+        bg.setCornerRadius(radius);
+        return bg;
+    }
+
+    private Button makeButton(String text, int color) {
+        Button button = new Button(this);
+        button.setText(text);
+        button.setTextColor(Color.WHITE);
+        button.setTextSize(13);
+        button.setAllCaps(false);
+        button.setPadding(8, 6, 8, 6);
+        button.setBackground(roundBg(color, 18));
+        return button;
+    }
+
+    private LinearLayout.LayoutParams weightedParams() {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        params.setMargins(3, 3, 3, 3);
+        return params;
+    }
+
+    private void updateVoiceButton() {
+        if (voiceButton != null) {
+            voiceButton.setText(voiceEnabled ? "🔊 RIYA Voice: ON" : "🔇 RIYA Voice: OFF");
+        }
+    }
+
+    private void toggleVoice() {
+        voiceEnabled = !voiceEnabled;
+        getSharedPreferences("riya_settings", MODE_PRIVATE)
+                .edit().putBoolean("voice_enabled", voiceEnabled).apply();
+
+        Intent intent = new Intent("com.bubai.riya.SET_VOICE_ENABLED");
+        intent.setPackage(getPackageName());
+        intent.putExtra("enabled", voiceEnabled);
+        sendBroadcast(intent);
+        updateVoiceButton();
+
+        Toast.makeText(this, voiceEnabled ? "RIYA Voice চালু ❤️" : "RIYA Voice বন্ধ",
+                Toast.LENGTH_SHORT).show();
+    }
+
+    private void startVoiceInput() {
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            Toast.makeText(this, "এই ফোনে Speech Recognition পাওয়া যাচ্ছে না।",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},
+                    MIC_PERMISSION);
+            return;
+        }
+
+        if (speechRecognizer != null) speechRecognizer.destroy();
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+
+        speechRecognizer.setRecognitionListener(new RecognitionListener() {
+            @Override public void onReadyForSpeech(Bundle params) {
+                runOnUiThread(() -> micButton.setText("🎙 শুনছি..."));
+            }
+            @Override public void onResults(Bundle results) {
+                java.util.ArrayList<String> matches =
+                        results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                if (matches != null && !matches.isEmpty()) {
+                    messageInput.setText(matches.get(0));
+                    messageInput.setSelection(messageInput.length());
+                }
+                micButton.setText("🎙");
+            }
+            @Override public void onError(int error) {
+                micButton.setText("🎙");
+                Toast.makeText(MainActivity.this, "কথা বোঝা যায়নি, আবার চেষ্টা করো।",
+                        Toast.LENGTH_SHORT).show();
+            }
+            @Override public void onBeginningOfSpeech() {}
+            @Override public void onRmsChanged(float rmsdB) {}
+            @Override public void onBufferReceived(byte[] buffer) {}
+            @Override public void onEndOfSpeech() {}
+            @Override public void onPartialResults(Bundle partialResults) {}
+            @Override public void onEvent(int eventType, Bundle params) {}
+        });
+
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "bn-IN");
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "bn-IN");
+        intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
+        speechRecognizer.startListening(intent);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                                           int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == MIC_PERMISSION && grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            startVoiceInput();
+        } else if (requestCode == MIC_PERMISSION) {
+            Toast.makeText(this, "Microphone permission প্রয়োজন।",
+                    Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void addMessage(String sender, String message) {
         TextView bubble = new TextView(this);
         bubble.setText(sender + ":\n" + message);
         bubble.setTextSize(16);
+        bubble.setTextColor(Color.WHITE);
         bubble.setPadding(16, 12, 16, 12);
-        bubble.setBackgroundColor(sender.equals("তুমি")
-                ? 0xFFE3F2FD : 0xFFFCE4EC);
+        bubble.setBackground(roundBg(sender.equals("তুমি") ? 0xFF514078 : 0xFF34304D, 18));
 
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -321,6 +484,15 @@ public class MainActivity extends Activity {
             );
             startActivityForResult(permission, OVERLAY_REQUEST);
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (speechRecognizer != null) {
+            speechRecognizer.destroy();
+            speechRecognizer = null;
+        }
+        super.onDestroy();
     }
 
     @Override
