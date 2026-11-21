@@ -22,6 +22,7 @@ import android.view.WindowManager;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.ImageView;
+import android.widget.FrameLayout;
 import android.widget.Toast;
 
 public class FloatingService extends Service {
@@ -56,19 +57,40 @@ public class FloatingService extends Service {
         panel.setPadding(10, 10, 10, 10);
         panel.setBackgroundColor(Color.rgb(255, 225, 239));
 
+        FrameLayout avatarFrame = new FrameLayout(this);
+        LinearLayout.LayoutParams frameParams =
+                new LinearLayout.LayoutParams(240, 394);
+        avatarFrame.setLayoutParams(frameParams);
+
         ImageView avatar = new ImageView(this);
         avatar.setImageResource(R.drawable.riya_sleeping);
         avatar.setScaleType(ImageView.ScaleType.FIT_CENTER);
 
-        LinearLayout.LayoutParams imageParams =
-                new LinearLayout.LayoutParams(240, 394);
+        FrameLayout.LayoutParams imageParams =
+                new FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                );
         avatar.setLayoutParams(imageParams);
-        idleAnimator = new RiyaIdleAnimator(avatar);
-        speakingAnimator = new RiyaSpeakingAnimator(avatar);
         avatar.setClipToOutline(true);
         avatar.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
         avatar.setBackgroundColor(Color.WHITE);
-        panel.addView(avatar);
+        avatarFrame.addView(avatar);
+
+        RiyaMouthView mouth = new RiyaMouthView(this);
+        float density = getResources().getDisplayMetrics().density;
+        FrameLayout.LayoutParams mouthParams =
+                new FrameLayout.LayoutParams(
+                        Math.round(62 * density),
+                        Math.round(39 * density)
+                );
+        mouthParams.leftMargin = Math.round(140 * density);
+        mouthParams.topMargin = Math.round(131 * density);
+        avatarFrame.addView(mouth, mouthParams);
+
+        idleAnimator = new RiyaIdleAnimator(avatar);
+        speakingAnimator = new RiyaSpeakingAnimator(mouth);
+        panel.addView(avatarFrame);
 
         TextView status = new TextView(this);
         status.setText("RIYA • Sleeping 💤");
@@ -221,7 +243,7 @@ public class FloatingService extends Service {
                         initialSpan[0] = (float) Math.hypot(x, y);
 
                         LinearLayout.LayoutParams lp =
-                                (LinearLayout.LayoutParams) avatar.getLayoutParams();
+                                (LinearLayout.LayoutParams) avatarFrame.getLayoutParams();
                         baseWidth[0] = lp.width;
                         baseHeight[0] = lp.height;
                         baseTextSize[0] = status.getTextSize() /
@@ -243,10 +265,18 @@ public class FloatingService extends Service {
                         int newHeight = Math.round(baseHeight[0] * scale);
 
                         LinearLayout.LayoutParams lp =
-                                (LinearLayout.LayoutParams) avatar.getLayoutParams();
+                                (LinearLayout.LayoutParams) avatarFrame.getLayoutParams();
                         lp.width = newWidth;
                         lp.height = newHeight;
-                        avatar.setLayoutParams(lp);
+                        avatarFrame.setLayoutParams(lp);
+                        float scaleX = newWidth / 240f;
+                        float scaleY = newHeight / 394f;
+                        mouth.setPivotX(0f);
+                        mouth.setPivotY(0f);
+                        mouth.setScaleX(scaleX);
+                        mouth.setScaleY(scaleY);
+                        mouth.setTranslationX(140f * (scaleX - 1f));
+                        mouth.setTranslationY(131f * (scaleY - 1f));
 
                         status.setTextSize(baseTextSize[0] * scale);
                         int pad = Math.round(10 * scale);
