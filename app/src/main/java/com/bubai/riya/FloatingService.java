@@ -79,14 +79,10 @@ public class FloatingService extends Service {
         avatarFrame.addView(avatar);
 
         RiyaMouthView mouth = new RiyaMouthView(this);
-        float density = getResources().getDisplayMetrics().density;
         FrameLayout.LayoutParams mouthParams =
-                new FrameLayout.LayoutParams(
-                        Math.round(62 * density),
-                        Math.round(39 * density)
-                );
-        mouthParams.leftMargin = Math.round(140 * density);
-        mouthParams.topMargin = Math.round(131 * density);
+                new FrameLayout.LayoutParams(62, 39);
+        mouthParams.leftMargin = 140;
+        mouthParams.topMargin = 131;
         avatarFrame.addView(mouth, mouthParams);
 
         idleAnimator = new RiyaIdleAnimator(avatar);

@@ -2,47 +2,74 @@ package com.bubai.riya;
 
 import android.animation.ValueAnimator;
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
-import android.graphics.Path;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
 
 public class RiyaMouthView extends View {
-    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+    private final Bitmap closedMouth;
+    private final Bitmap smallMouth;
+    private final Bitmap openMouth;
+
     private ValueAnimator animator;
     private float opening = 0f;
 
     public RiyaMouthView(Context context) {
         super(context);
-        setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+
+        closedMouth = BitmapFactory.decodeResource(
+                getResources(), R.drawable.riya_mouth_closed);
+        smallMouth = BitmapFactory.decodeResource(
+                getResources(), R.drawable.riya_mouth_small);
+        openMouth = BitmapFactory.decodeResource(
+                getResources(), R.drawable.riya_mouth_open);
+
         setVisibility(INVISIBLE);
     }
 
     public void startSpeaking() {
         stopAnimator();
-        opening = 0.04f;
+        opening = 0.03f;
         setVisibility(VISIBLE);
         invalidate();
     }
 
     public void setMouthForCharacter(char ch) {
         float target;
+
         switch (ch) {
-            case 'আ': case 'া': target = 0.90f; break;
-            case 'অ': case 'ও': case 'ো': target = 0.62f; break;
+            case 'আ': case 'া':
+                target = 0.95f;
+                break;
+            case 'অ': case 'ও': case 'ো':
+                target = 0.75f;
+                break;
             case 'ই': case 'ঈ': case 'ি': case 'ী':
             case 'উ': case 'ঊ': case 'ু': case 'ূ':
-                target = 0.28f; break;
+                target = 0.30f;
+                break;
             case 'এ': case 'ঐ': case 'ে': case 'ৈ':
-                target = 0.52f; break;
-            case 'ঔ': case 'ৌ': target = 0.72f; break;
+                target = 0.55f;
+                break;
+            case 'ঔ': case 'ৌ':
+                target = 0.85f;
+                break;
             case 'ম': case 'প': case 'ব': case 'ভ':
-                target = 0.035f; break;
+                target = 0.02f;
+                break;
             case '।': case ',': case '?': case '!':
-                target = 0.02f; break;
-            case ' ': target = 0.08f; break;
-            default: target = 0.34f; break;
+                target = 0.02f;
+                break;
+            case ' ':
+                target = 0.08f;
+                break;
+            default:
+                target = 0.40f;
+                break;
         }
 
         stopAnimator();
@@ -73,35 +100,23 @@ public class RiyaMouthView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        if (opening < 0.02f) return;
 
-        float w = getWidth(), h = getHeight();
-        float cx = w * 0.55f, cy = h * 0.49f;
-        float halfW = w * 0.43f;
-        float openH = h * (0.025f + opening * 0.25f);
-
-        Path mouth = new Path();
-        mouth.moveTo(cx - halfW, cy);
-        mouth.cubicTo(cx - halfW * 0.5f, cy - openH,
-                cx + halfW * 0.5f, cy - openH, cx + halfW, cy);
-        mouth.cubicTo(cx + halfW * 0.5f, cy + openH,
-                cx - halfW * 0.5f, cy + openH, cx - halfW, cy);
-        mouth.close();
-
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(0xFF54212B);
-        canvas.drawPath(mouth, paint);
-
-        if (opening > 0.35f) {
-            paint.setColor(0xFFE56F83);
-            canvas.drawOval(cx - halfW * 0.35f, cy,
-                    cx + halfW * 0.35f, cy + openH * 0.75f, paint);
+        Bitmap mouth;
+        if (opening >= 0.60f) {
+            mouth = openMouth;
+        } else if (opening >= 0.12f) {
+            mouth = smallMouth;
+        } else {
+            mouth = closedMouth;
         }
 
-        paint.setColor(0xFFB94F65);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(Math.max(1f, h * 0.035f));
-        canvas.drawPath(mouth, paint);
-        paint.setStyle(Paint.Style.FILL);
+        if (mouth != null && !mouth.isRecycled()) {
+            canvas.drawBitmap(
+                    mouth,
+                    null,
+                    new android.graphics.RectF(0, 0, getWidth(), getHeight()),
+                    paint
+            );
+        }
     }
 }
