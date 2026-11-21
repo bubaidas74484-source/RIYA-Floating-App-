@@ -11,6 +11,10 @@ public class RiyaSpeakingAnimator {
         if (mouth != null) mouth.startSpeaking();
     }
 
+    public void onTextCharacter(char ch) {
+        if (mouth != null) mouth.setMouthForCharacter(ch);
+    }
+
     public void stop() {
         if (mouth != null) mouth.stopSpeaking();
     }

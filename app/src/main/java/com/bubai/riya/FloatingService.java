@@ -37,6 +37,7 @@ public class FloatingService extends Service {
     private BroadcastReceiver speechReceiver;
     private boolean voiceEnabled = true;
     private String lastSpokenReply;
+    private volatile String currentSpeechText = "";
     private RiyaIdleAnimator idleAnimator;
     private RiyaSpeakingAnimator speakingAnimator;
     private float touchX, touchY;
@@ -134,6 +135,19 @@ public class FloatingService extends Service {
                         speakingAnimator.start();
                         status.setText("RIYA • কথা বলছে 🗣️");
                     });
+                }
+            }
+
+            @Override
+            public void onRangeStart(String utteranceId, int start, int end, int frame) {
+                if ("RIYA_REPLY".equals(utteranceId)) {
+                    String spoken = currentSpeechText;
+                    if (spoken == null || spoken.isEmpty()) return;
+                    int index = Math.max(0, Math.min(start, spoken.length() - 1));
+                    int codePoint = spoken.codePointAt(index);
+                    char spokenChar = Character.toChars(codePoint)[0];
+                    new android.os.Handler(getMainLooper()).post(() ->
+                            speakingAnimator.onTextCharacter(spokenChar));
                 }
             }
 
@@ -330,6 +344,7 @@ public class FloatingService extends Service {
                 .trim();
 
         if (!speechText.isEmpty()) {
+            currentSpeechText = speechText;
             textToSpeech.speak(
                     speechText,
                     TextToSpeech.QUEUE_FLUSH,
