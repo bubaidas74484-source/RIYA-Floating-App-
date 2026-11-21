@@ -5,9 +5,8 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.RectF;
 import android.view.View;
-import android.view.animation.AccelerateDecelerateInterpolator;
+import android.view.animation.LinearInterpolator;
 
 public class RiyaMouthView extends View {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -18,16 +17,21 @@ public class RiyaMouthView extends View {
         super(context);
         setLayerType(View.LAYER_TYPE_SOFTWARE, null);
         setVisibility(INVISIBLE);
+        paint.setStyle(Paint.Style.FILL);
     }
 
     public void startSpeaking() {
         if (animator != null && animator.isRunning()) return;
 
         setVisibility(VISIBLE);
-        animator = ValueAnimator.ofFloat(0f, 1f, 0.25f, 0.8f, 0f);
-        animator.setDuration(520);
+
+        animator = ValueAnimator.ofFloat(
+            0.08f, 0.42f, 0.16f, 0.72f,
+            0.28f, 0.92f, 0.12f, 0.55f, 0.08f
+        );
+        animator.setDuration(1050);
         animator.setRepeatCount(ValueAnimator.INFINITE);
-        animator.setInterpolator(new AccelerateDecelerateInterpolator());
+        animator.setInterpolator(new LinearInterpolator());
         animator.addUpdateListener(value -> {
             opening = (float) value.getAnimatedValue();
             invalidate();
@@ -49,33 +53,65 @@ public class RiyaMouthView extends View {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
 
-        if (opening < 0.08f) return;
+        if (opening < 0.03f) return;
 
-        float cx = getWidth() * 0.62f;
-        float cy = getHeight() * 0.43f;
-        float halfWidth = getWidth() * 0.34f;
-        float height = getHeight() * (0.08f + opening * 0.25f);
+        float w = getWidth();
+        float h = getHeight();
 
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(0xFF54212B);
+        float cx = w * 0.55f;
+        float cy = h * 0.49f;
+        float halfW = w * 0.43f;
+        float openH = h * (0.025f + opening * 0.25f);
 
-        RectF mouth = new RectF(
-                cx - halfWidth,
-                cy - height,
-                cx + halfWidth,
-                cy + height
+        Path mouth = new Path();
+
+        mouth.moveTo(cx - halfW, cy);
+        mouth.cubicTo(
+            cx - halfW * 0.55f, cy - openH * 0.45f,
+            cx - halfW * 0.25f, cy - openH * 0.75f,
+            cx, cy - openH * 0.38f
         );
-        canvas.drawOval(mouth, paint);
+        mouth.cubicTo(
+            cx + halfW * 0.25f, cy - openH * 0.75f,
+            cx + halfW * 0.55f, cy - openH * 0.45f,
+            cx + halfW, cy
+        );
+        mouth.cubicTo(
+            cx + halfW * 0.55f, cy + openH * 0.8f,
+            cx + halfW * 0.25f, cy + openH,
+            cx, cy + openH * 0.85f
+        );
+        mouth.cubicTo(
+            cx - halfW * 0.25f, cy + openH,
+            cx - halfW * 0.55f, cy + openH * 0.8f,
+            cx - halfW, cy
+        );
+        mouth.close();
 
-        if (opening > 0.55f) {
-            paint.setColor(0xFF9E4053);
-            RectF tongue = new RectF(
-                    cx - halfWidth * 0.45f,
-                    cy + height * 0.25f,
-                    cx + halfWidth * 0.45f,
-                    cy + height * 0.82f
+        paint.setColor(0xFF54212B);
+        canvas.drawPath(mouth, paint);
+
+        if (opening > 0.35f) {
+            Path tongue = new Path();
+            tongue.moveTo(cx - halfW * 0.38f, cy + openH * 0.38f);
+            tongue.quadTo(
+                cx, cy + openH * 1.05f,
+                cx + halfW * 0.38f, cy + openH * 0.38f
             );
-            canvas.drawOval(tongue, paint);
+            tongue.quadTo(
+                cx, cy + openH * 0.65f,
+                cx - halfW * 0.38f, cy + openH * 0.38f
+            );
+            tongue.close();
+
+            paint.setColor(0xFFE56F83);
+            canvas.drawPath(tongue, paint);
         }
+
+        paint.setColor(0xFFB94F65);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(Math.max(1f, h * 0.035f));
+        canvas.drawPath(mouth, paint);
+        paint.setStyle(Paint.Style.FILL);
     }
 }
