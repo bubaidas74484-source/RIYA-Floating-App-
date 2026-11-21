@@ -36,6 +36,7 @@ public class FloatingService extends Service {
     private BroadcastReceiver speechReceiver;
     private boolean voiceEnabled = true;
     private String lastSpokenReply;
+    private RiyaIdleAnimator idleAnimator;
     private float touchX, touchY;
     private int startX, startY;
 
@@ -61,6 +62,7 @@ public class FloatingService extends Service {
         LinearLayout.LayoutParams imageParams =
                 new LinearLayout.LayoutParams(240, 394);
         avatar.setLayoutParams(imageParams);
+        idleAnimator = new RiyaIdleAnimator(avatar);
         avatar.setClipToOutline(true);
         avatar.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
         avatar.setBackgroundColor(Color.WHITE);
@@ -104,6 +106,7 @@ public class FloatingService extends Service {
             public void onStart(String utteranceId) {
                 if ("RIYA_REPLY".equals(utteranceId)) {
                     new android.os.Handler(getMainLooper()).post(() -> {
+                        idleAnimator.stop();
                         status.setText("RIYA • কথা বলছে 🗣️");
                         avatar.animate().scaleX(1.025f).scaleY(1.025f)
                                 .setDuration(180).start();
@@ -118,6 +121,7 @@ public class FloatingService extends Service {
                         avatar.animate().scaleX(1f).scaleY(1f)
                                 .setDuration(220).start();
                         status.setText(awake ? "RIYA • Awake ✨" : "RIYA • Sleeping 💤");
+                        if (awake) idleAnimator.start(); else idleAnimator.stop();
                     });
                 }
             }
@@ -127,6 +131,7 @@ public class FloatingService extends Service {
                 if ("RIYA_REPLY".equals(utteranceId)) {
                     new android.os.Handler(getMainLooper()).post(() -> {
                         avatar.animate().scaleX(1f).scaleY(1f).start();
+                        if (awake) idleAnimator.start(); else idleAnimator.stop();
                     });
                 }
             }
@@ -160,6 +165,7 @@ public class FloatingService extends Service {
 
                 awake = true;
                 avatar.setImageResource(R.drawable.riya_awake);
+                idleAnimator.start();
                 status.setText("RIYA • কথা বলছে 🗣️");
                 lastSpokenReply = reply;
                 pendingReply = reply;
@@ -265,6 +271,7 @@ public class FloatingService extends Service {
                     float dy = event.getRawY() - touchY;
                     if (!pinching[0] && Math.abs(dx) < 60 && Math.abs(dy) < 60) {
                         awake = !awake;
+                        if (awake) idleAnimator.start(); else idleAnimator.stop();
                         avatar.setImageResource(awake
                                 ? R.drawable.riya_awake
                                 : R.drawable.riya_sleeping);
@@ -305,6 +312,7 @@ public class FloatingService extends Service {
 
     @Override
     public void onDestroy() {
+        if (idleAnimator != null) idleAnimator.stop();
         if (speechReceiver != null) {
             unregisterReceiver(speechReceiver);
             speechReceiver = null;
