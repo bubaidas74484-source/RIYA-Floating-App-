@@ -6,8 +6,9 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.RectF;
 import android.view.View;
-import android.view.animation.DecelerateInterpolator;
+import android.view.animation.AccelerateDecelerateInterpolator;
 
 public class RiyaMouthView extends View {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
@@ -21,19 +22,16 @@ public class RiyaMouthView extends View {
     public RiyaMouthView(Context context) {
         super(context);
 
-        closedMouth = BitmapFactory.decodeResource(
-                getResources(), R.drawable.riya_mouth_closed);
-        smallMouth = BitmapFactory.decodeResource(
-                getResources(), R.drawable.riya_mouth_small);
-        openMouth = BitmapFactory.decodeResource(
-                getResources(), R.drawable.riya_mouth_open);
+        closedMouth = BitmapFactory.decodeResource(getResources(), R.drawable.riya_mouth_closed);
+        smallMouth = BitmapFactory.decodeResource(getResources(), R.drawable.riya_mouth_small);
+        openMouth = BitmapFactory.decodeResource(getResources(), R.drawable.riya_mouth_open);
 
         setVisibility(INVISIBLE);
     }
 
     public void startSpeaking() {
         stopAnimator();
-        opening = 0.03f;
+        opening = 0.25f;
         setVisibility(VISIBLE);
         invalidate();
     }
@@ -43,43 +41,54 @@ public class RiyaMouthView extends View {
 
         switch (ch) {
             case 'আ': case 'া':
+                target = 1.00f;
+                break;
+
+            case 'অ': case 'ও': case 'ো':
                 target = 0.95f;
                 break;
-            case 'অ': case 'ও': case 'ো':
-                target = 0.75f;
+
+            case 'ঔ': case 'ৌ':
+                target = 1.00f;
                 break;
+
+            case 'এ': case 'ঐ': case 'ে': case 'ৈ':
+                target = 0.78f;
+                break;
+
             case 'ই': case 'ঈ': case 'ি': case 'ী':
             case 'উ': case 'ঊ': case 'ু': case 'ূ':
-                target = 0.30f;
+                target = 0.65f;
                 break;
-            case 'এ': case 'ঐ': case 'ে': case 'ৈ':
-                target = 0.55f;
-                break;
-            case 'ঔ': case 'ৌ':
-                target = 0.85f;
-                break;
+
             case 'ম': case 'প': case 'ব': case 'ভ':
-                target = 0.02f;
+                target = 0.05f;
                 break;
+
             case '।': case ',': case '?': case '!':
-                target = 0.02f;
+                target = 0.05f;
                 break;
+
             case ' ':
-                target = 0.08f;
+                target = 0.18f;
                 break;
+
             default:
-                target = 0.40f;
+                target = 0.82f;
                 break;
         }
 
         stopAnimator();
+
         animator = ValueAnimator.ofFloat(opening, target);
-        animator.setDuration(85);
-        animator.setInterpolator(new DecelerateInterpolator());
+        animator.setDuration(110);
+        animator.setInterpolator(new AccelerateDecelerateInterpolator());
+
         animator.addUpdateListener(v -> {
             opening = (float) v.getAnimatedValue();
             invalidate();
         });
+
         animator.start();
     }
 
@@ -102,9 +111,10 @@ public class RiyaMouthView extends View {
         super.onDraw(canvas);
 
         Bitmap mouth;
-        if (opening >= 0.60f) {
+
+        if (opening >= 0.72f) {
             mouth = openMouth;
-        } else if (opening >= 0.12f) {
+        } else if (opening >= 0.25f) {
             mouth = smallMouth;
         } else {
             mouth = closedMouth;
@@ -112,10 +122,10 @@ public class RiyaMouthView extends View {
 
         if (mouth != null && !mouth.isRecycled()) {
             canvas.drawBitmap(
-                    mouth,
-                    null,
-                    new android.graphics.RectF(0, 0, getWidth(), getHeight()),
-                    paint
+                mouth,
+                null,
+                new RectF(0, 0, getWidth(), getHeight()),
+                paint
             );
         }
     }
