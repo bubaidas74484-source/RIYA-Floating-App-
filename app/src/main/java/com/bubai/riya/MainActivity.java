@@ -106,8 +106,11 @@ public class MainActivity extends Activity {
         topRow.addView(start, weightedParams());
 
         Button stop = makeButton("☾ Sleep", 0xFF39345F);
-        stop.setOnClickListener(v ->
-                stopService(new Intent(this, FloatingService.class)));
+        stop.setOnClickListener(v -> {
+            Intent sleepIntent = new Intent(this, FloatingService.class);
+            sleepIntent.setAction(FloatingService.ACTION_SLEEP);
+            startService(sleepIntent);
+        });
         topRow.addView(stop, weightedParams());
         layout.addView(topRow);
 
@@ -522,7 +525,9 @@ public class MainActivity extends Activity {
 
     private void showRiya() {
         if (Settings.canDrawOverlays(this)) {
-            startService(new Intent(this, FloatingService.class));
+            Intent showIntent = new Intent(this, FloatingService.class);
+            showIntent.setAction(FloatingService.ACTION_SHOW);
+            startService(showIntent);
         } else {
             Intent permission = new Intent(
                     Settings.ACTION_MANAGE_OVERLAY_PERMISSION,

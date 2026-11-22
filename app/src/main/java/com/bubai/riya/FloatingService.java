@@ -1,6 +1,10 @@
 package com.bubai.riya;
 
 import android.app.Service;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
@@ -15,6 +19,7 @@ import android.graphics.Typeface;
 import android.graphics.Outline;
 import android.os.IBinder;
 import android.view.Gravity;
+import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewOutlineProvider;
@@ -26,6 +31,12 @@ import android.widget.FrameLayout;
 import android.widget.Toast;
 
 public class FloatingService extends Service {
+    public static final String ACTION_SHOW = "com.bubai.riya.SHOW_POPUP";
+    public static final String ACTION_SLEEP = "com.bubai.riya.SLEEP_RIYA";
+
+    private ImageView avatarView;
+    private TextView statusView;
+    private boolean popupHidden = false;
 
     private WindowManager windowManager;
     private View floatingView;
@@ -64,6 +75,7 @@ public class FloatingService extends Service {
         avatarFrame.setLayoutParams(frameParams);
 
         ImageView avatar = new ImageView(this);
+        avatarView = avatar;
         avatar.setImageResource(R.drawable.riya_sleeping);
         avatar.setScaleType(ImageView.ScaleType.FIT_CENTER);
 
@@ -90,6 +102,7 @@ public class FloatingService extends Service {
         panel.addView(avatarFrame);
 
         TextView status = new TextView(this);
+        statusView = status;
         status.setText("RIYA • Sleeping 💤");
         status.setTextColor(Color.rgb(100, 40, 75));
         status.setTextSize(12);
@@ -236,7 +249,40 @@ public class FloatingService extends Service {
         float[] baseTextSize = {12f};
         boolean[] pinching = {false};
 
+        GestureDetector gestureDetector = new GestureDetector(this,
+                new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onDown(MotionEvent event) {
+                return true;
+            }
+
+            @Override
+            public boolean onSingleTapConfirmed(MotionEvent event) {
+                if (popupHidden) return false;
+
+                awake = !awake;
+                if (awake) idleAnimator.start();
+                else idleAnimator.stop();
+
+                avatarView.setImageResource(awake
+                        ? R.drawable.riya_awake
+                        : R.drawable.riya_sleeping);
+                statusView.setText(awake
+                        ? "RIYA • Awake ✨"
+                        : "RIYA • Sleeping 💤");
+                return true;
+            }
+
+            @Override
+            public boolean onDoubleTap(MotionEvent event) {
+                popupHidden = true;
+                floatingView.setVisibility(View.GONE);
+                return true;
+            }
+        });
+
         View.OnTouchListener touchListener = (view, event) -> {
+            gestureDetector.onTouchEvent(event);
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
                     touchX = event.getRawX();
@@ -307,18 +353,6 @@ public class FloatingService extends Service {
                     return true;
 
                 case MotionEvent.ACTION_UP:
-                    float dx = event.getRawX() - touchX;
-                    float dy = event.getRawY() - touchY;
-                    if (!pinching[0] && Math.abs(dx) < 60 && Math.abs(dy) < 60) {
-                        awake = !awake;
-                        if (awake) idleAnimator.start(); else idleAnimator.stop();
-                        avatar.setImageResource(awake
-                                ? R.drawable.riya_awake
-                                : R.drawable.riya_sleeping);
-                        status.setText(awake
-                                ? "RIYA • Awake ✨"
-                                : "RIYA • Sleeping 💤");
-                    }
                     initialSpan[0] = 0f;
                     pinching[0] = false;
                     return true;
@@ -349,6 +383,68 @@ public class FloatingService extends Service {
             );
         }
         pendingReply = null;
+    }
+
+    private void ensureForegroundNotification() {
+        final String channelId = "riya_companion_service";
+        NotificationManager manager =
+                (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    channelId, "RIYA Floating Companion",
+                    NotificationManager.IMPORTANCE_LOW);
+            channel.setDescription("Keeps the RIYA floating companion available");
+            manager.createNotificationChannel(channel);
+        }
+
+        Intent openApp = new Intent(this, MainActivity.class);
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                this, 0, openApp,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        Notification.Builder builder;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            builder = new Notification.Builder(this, channelId);
+        } else {
+            builder = new Notification.Builder(this);
+        }
+
+        Notification notification = builder
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle("RIYA is active ❤️")
+                .setContentText("Double-tap the popup to hide it")
+                .setContentIntent(pendingIntent)
+                .setOngoing(true)
+                .setCategory(Notification.CATEGORY_SERVICE)
+                .build();
+
+        startForeground(1001, notification);
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        ensureForegroundNotification();
+        String action = intent == null ? null : intent.getAction();
+
+        if (ACTION_SHOW.equals(action) && floatingView != null) {
+            popupHidden = false;
+            floatingView.setVisibility(View.VISIBLE);
+        } else if (ACTION_SLEEP.equals(action)) {
+            awake = false;
+            if (idleAnimator != null) idleAnimator.stop();
+            if (speakingAnimator != null) speakingAnimator.stop();
+            if (textToSpeech != null) textToSpeech.stop();
+
+            if (avatarView != null) {
+                avatarView.setImageResource(R.drawable.riya_sleeping);
+            }
+            if (statusView != null) {
+                statusView.setText("RIYA • Sleeping 💤");
+            }
+        }
+
+        return START_STICKY;
     }
 
     @Override
