@@ -8,88 +8,89 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.view.View;
-import android.view.animation.AccelerateDecelerateInterpolator;
+import android.view.animation.LinearInterpolator;
 
 public class RiyaMouthView extends View {
-    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+    private final Paint paint = new Paint(
+            Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG
+    );
+
     private final Bitmap closedMouth;
     private final Bitmap smallMouth;
     private final Bitmap openMouth;
 
     private ValueAnimator animator;
     private float opening = 0f;
+    private float characterStrength = 0.90f;
 
     public RiyaMouthView(Context context) {
         super(context);
 
-        closedMouth = BitmapFactory.decodeResource(getResources(), R.drawable.riya_mouth_closed);
-        smallMouth = BitmapFactory.decodeResource(getResources(), R.drawable.riya_mouth_small);
-        openMouth = BitmapFactory.decodeResource(getResources(), R.drawable.riya_mouth_open);
+        closedMouth = BitmapFactory.decodeResource(
+                getResources(), R.drawable.riya_mouth_closed);
+        smallMouth = BitmapFactory.decodeResource(
+                getResources(), R.drawable.riya_mouth_small);
+        openMouth = BitmapFactory.decodeResource(
+                getResources(), R.drawable.riya_mouth_open);
 
         setVisibility(INVISIBLE);
     }
 
     public void startSpeaking() {
         stopAnimator();
-        opening = 0.25f;
+
+        opening = 0.08f;
+        characterStrength = 0.90f;
+
         setVisibility(VISIBLE);
-        invalidate();
-    }
 
-    public void setMouthForCharacter(char ch) {
-        float target;
-
-        switch (ch) {
-            case 'আ': case 'া':
-                target = 1.00f;
-                break;
-
-            case 'অ': case 'ও': case 'ো':
-                target = 0.95f;
-                break;
-
-            case 'ঔ': case 'ৌ':
-                target = 1.00f;
-                break;
-
-            case 'এ': case 'ঐ': case 'ে': case 'ৈ':
-                target = 0.78f;
-                break;
-
-            case 'ই': case 'ঈ': case 'ি': case 'ী':
-            case 'উ': case 'ঊ': case 'ু': case 'ূ':
-                target = 0.65f;
-                break;
-
-            case 'ম': case 'প': case 'ব': case 'ভ':
-                target = 0.05f;
-                break;
-
-            case '।': case ',': case '?': case '!':
-                target = 0.05f;
-                break;
-
-            case ' ':
-                target = 0.18f;
-                break;
-
-            default:
-                target = 0.82f;
-                break;
-        }
-
-        stopAnimator();
-
-        animator = ValueAnimator.ofFloat(opening, target);
-        animator.setDuration(110);
-        animator.setInterpolator(new AccelerateDecelerateInterpolator());
+        animator = ValueAnimator.ofFloat(0f, 1f);
+        animator.setDuration(420);
+        animator.setRepeatCount(ValueAnimator.INFINITE);
+        animator.setInterpolator(new LinearInterpolator());
 
         animator.addUpdateListener(v -> {
-            opening = (float) v.getAnimatedValue();
+            float phase = (float) v.getAnimatedValue();
+            float pulse = (float) Math.sin(phase * Math.PI);
+
+            opening = 0.04f + characterStrength * pulse * 0.96f;
             invalidate();
         });
 
         animator.start();
+        invalidate();
+    }
+
+    public void setMouthForCharacter(char ch) {
+        switch (ch) {
+            case 'আ': case 'া':
+            case 'অ': case 'ও': case 'ো':
+            case 'ঔ': case 'ৌ':
+                characterStrength = 1.00f;
+                break;
+
+            case 'এ': case 'ঐ': case 'ে': case 'ৈ':
+            case 'ই': case 'ঈ': case 'ি': case 'ী':
+            case 'উ': case 'ঊ': case 'ু': case 'ূ':
+                characterStrength = 0.90f;
+                break;
+
+            case 'ম': case 'প': case 'ব': case 'ভ':
+                characterStrength = 0.35f;
+                break;
+
+            case '।': case ',': case '?': case '!':
+                characterStrength = 0.12f;
+                break;
+
+            case ' ':
+                characterStrength = 0.30f;
+                break;
+
+            default:
+                characterStrength = 0.85f;
+                break;
+        }
     }
 
     private void stopAnimator() {
@@ -112,21 +113,26 @@ public class RiyaMouthView extends View {
 
         Bitmap mouth;
 
-        if (opening >= 0.72f) {
+        if (opening >= 0.58f) {
             mouth = openMouth;
-        } else if (opening >= 0.25f) {
+        } else if (opening >= 0.16f) {
             mouth = smallMouth;
         } else {
             mouth = closedMouth;
         }
 
         if (mouth != null && !mouth.isRecycled()) {
-            canvas.drawBitmap(
-                mouth,
-                null,
-                new RectF(0, 0, getWidth(), getHeight()),
-                paint
+            float drawHeight = getHeight() * (0.85f + opening * 0.55f);
+            float centerY = getHeight() / 2f;
+
+            RectF destination = new RectF(
+                    0,
+                    centerY - drawHeight / 2f,
+                    getWidth(),
+                    centerY + drawHeight / 2f
             );
+
+            canvas.drawBitmap(mouth, null, destination, paint);
         }
     }
 }
