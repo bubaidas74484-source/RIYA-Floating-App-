@@ -98,7 +98,7 @@ public class MainActivity extends Activity {
         topRow.setOrientation(LinearLayout.HORIZONTAL);
 
         Button settingsButton = makeButton("⚙ Settings", 0xFF39345F);
-        settingsButton.setOnClickListener(v -> showTokenSettings());
+        settingsButton.setOnClickListener(v -> showRiyaSettings());
         topRow.addView(settingsButton, weightedParams());
 
         Button start = makeButton("☀ Wake RIYA", 0xFF6846A5);
@@ -424,7 +424,8 @@ public class MainActivity extends Activity {
     }
 
 
-    private void showTokenSettings() {
+
+    private void showRiyaSettings() {
         new Thread(() -> {
             HttpURLConnection connection = null;
             try {
@@ -441,13 +442,110 @@ public class MainActivity extends Activity {
                     while ((line = reader.readLine()) != null) response.append(line);
                 }
 
-                int current = new JSONObject(response.toString())
-                        .optInt("max_output_tokens", 500);
-                runOnUiThread(() -> showTokenDialog(current));
-
+                JSONObject data = new JSONObject(response.toString());
+                int tokens = data.optInt("max_output_tokens", 500);
+                int history = data.optInt("conversation_history_limit", 200);
+                runOnUiThread(() -> showRiyaSettingsDialog(tokens, history));
             } catch (Exception error) {
                 runOnUiThread(() -> Toast.makeText(this,
                         "বুবাই, Settings লোড হয়নি। BUBAI Server চালু আছে কি না দেখো।",
+                        Toast.LENGTH_LONG).show());
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+        }).start();
+    }
+
+    private void showRiyaSettingsDialog(int currentTokens, int currentHistory) {
+        int[] tokenValues = {200, 400, 500, 700, 1000};
+        int[] historyValues = {50, 100, 200, 300, 500};
+
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        layout.setPadding(40, 12, 40, 12);
+
+        android.widget.TextView tokenTitle = new android.widget.TextView(this);
+        tokenTitle.setText("Response Length");
+        tokenTitle.setTextSize(16);
+        layout.addView(tokenTitle);
+
+        RadioGroup tokenGroup = new RadioGroup(this);
+        tokenGroup.setOrientation(RadioGroup.VERTICAL);
+        for (int value : tokenValues) {
+            RadioButton option = new RadioButton(this);
+            option.setId(value);
+            option.setText(value + " tokens");
+            tokenGroup.addView(option);
+        }
+        tokenGroup.check(currentTokens);
+        layout.addView(tokenGroup);
+
+        android.widget.TextView historyTitle = new android.widget.TextView(this);
+        historyTitle.setText("Conversation History Limit");
+        historyTitle.setTextSize(16);
+        historyTitle.setPadding(0, 18, 0, 0);
+        layout.addView(historyTitle);
+
+        RadioGroup historyGroup = new RadioGroup(this);
+        historyGroup.setOrientation(RadioGroup.VERTICAL);
+        for (int value : historyValues) {
+            RadioButton option = new RadioButton(this);
+            option.setId(value + 1000);
+            option.setText(value + " messages");
+            historyGroup.addView(option);
+        }
+        historyGroup.check(currentHistory + 1000);
+        layout.addView(historyGroup);
+
+        new AlertDialog.Builder(this)
+                .setTitle("RIYA Settings")
+                .setMessage("দুটো সেটিংস এখান থেকে পরিবর্তন করো")
+                .setView(layout)
+                .setPositiveButton("Save", (dialog, which) -> {
+                    int tokens = tokenGroup.getCheckedRadioButtonId();
+                    int historyId = historyGroup.getCheckedRadioButtonId();
+                    if (tokens == -1) tokens = 500;
+                    int history = historyId == -1 ? 200 : historyId - 1000;
+                    saveRiyaSettings(tokens, history);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void saveRiyaSettings(int tokens, int history) {
+        new Thread(() -> {
+            HttpURLConnection connection = null;
+            try {
+                URL url = new URL("http://127.0.0.1:8765/api/riya/settings");
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("POST");
+                connection.setConnectTimeout(10000);
+                connection.setReadTimeout(10000);
+                connection.setDoOutput(true);
+                connection.setRequestProperty("Content-Type",
+                        "application/json; charset=UTF-8");
+
+                JSONObject request = new JSONObject();
+                request.put("max_output_tokens", tokens);
+                request.put("conversation_history_limit", history);
+
+                byte[] body = request.toString().getBytes("UTF-8");
+                try (OutputStream output = connection.getOutputStream()) {
+                    output.write(body);
+                }
+
+                int status = connection.getResponseCode();
+                if (status < 200 || status >= 300) {
+                    throw new Exception("HTTP " + status);
+                }
+
+                runOnUiThread(() -> Toast.makeText(this,
+                        "RIYA Settings saved: " + tokens + " tokens, "
+                                + history + " messages ❤️",
+                        Toast.LENGTH_LONG).show());
+            } catch (Exception error) {
+                runOnUiThread(() -> Toast.makeText(this,
+                        "Settings save হয়নি। Server connection পরীক্ষা করো।",
                         Toast.LENGTH_LONG).show());
             } finally {
                 if (connection != null) connection.disconnect();
