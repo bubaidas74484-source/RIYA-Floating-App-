@@ -53,6 +53,12 @@ public class MainActivity extends Activity {
     private static final int MIC_PERMISSION = 2002;
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        syncVoiceSettingFromServer();
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
@@ -239,6 +245,46 @@ public class MainActivity extends Activity {
         return params;
     }
 
+    private void syncVoiceSettingFromServer() {
+        new Thread(() -> {
+            HttpURLConnection connection = null;
+            try {
+                URL url = new URL("http://127.0.0.1:8765/api/riya/settings");
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("GET");
+                connection.setConnectTimeout(10000);
+                connection.setReadTimeout(10000);
+
+                JSONObject data;
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(connection.getInputStream(), "UTF-8"))) {
+                    StringBuilder response = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) response.append(line);
+                    data = new JSONObject(response.toString());
+                }
+
+                boolean serverVoiceEnabled = data.optBoolean("voice_enabled", true);
+
+                runOnUiThread(() -> {
+                    voiceEnabled = serverVoiceEnabled;
+                    getSharedPreferences("riya_settings", MODE_PRIVATE)
+                            .edit().putBoolean("voice_enabled", voiceEnabled).apply();
+
+                    Intent intent = new Intent("com.bubai.riya.SET_VOICE_ENABLED");
+                    intent.setPackage(getPackageName());
+                    intent.putExtra("enabled", voiceEnabled);
+                    sendBroadcast(intent);
+                    updateVoiceButton();
+                });
+            } catch (Exception error) {
+                android.util.Log.e("RIYA", "Voice settings sync failed", error);
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+        }).start();
+    }
+
     private void updateVoiceButton() {
         if (voiceButton != null) {
             voiceButton.setText(voiceEnabled ? "🔊 RIYA Voice: ON" : "🔇 RIYA Voice: OFF");
@@ -246,18 +292,63 @@ public class MainActivity extends Activity {
     }
 
     private void toggleVoice() {
-        voiceEnabled = !voiceEnabled;
-        getSharedPreferences("riya_settings", MODE_PRIVATE)
-                .edit().putBoolean("voice_enabled", voiceEnabled).apply();
+        final boolean newValue = !voiceEnabled;
 
-        Intent intent = new Intent("com.bubai.riya.SET_VOICE_ENABLED");
-        intent.setPackage(getPackageName());
-        intent.putExtra("enabled", voiceEnabled);
-        sendBroadcast(intent);
-        updateVoiceButton();
+        if (voiceButton != null) voiceButton.setEnabled(false);
 
-        Toast.makeText(this, voiceEnabled ? "RIYA Voice চালু ❤️" : "RIYA Voice বন্ধ",
-                Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            HttpURLConnection connection = null;
+            try {
+                URL url = new URL("http://127.0.0.1:8765/api/riya/settings");
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("POST");
+                connection.setConnectTimeout(10000);
+                connection.setReadTimeout(10000);
+                connection.setDoOutput(true);
+                connection.setRequestProperty(
+                        "Content-Type", "application/json; charset=UTF-8");
+
+                JSONObject request = new JSONObject();
+                request.put("voice_enabled", newValue);
+
+                byte[] body = request.toString().getBytes("UTF-8");
+                try (OutputStream output = connection.getOutputStream()) {
+                    output.write(body);
+                }
+
+                int status = connection.getResponseCode();
+                if (status < 200 || status >= 300) {
+                    throw new Exception("HTTP " + status);
+                }
+
+                runOnUiThread(() -> {
+                    voiceEnabled = newValue;
+
+                    getSharedPreferences("riya_settings", MODE_PRIVATE)
+                            .edit().putBoolean("voice_enabled", voiceEnabled).apply();
+
+                    Intent intent = new Intent("com.bubai.riya.SET_VOICE_ENABLED");
+                    intent.setPackage(getPackageName());
+                    intent.putExtra("enabled", voiceEnabled);
+                    sendBroadcast(intent);
+
+                    updateVoiceButton();
+                    Toast.makeText(this,
+                            voiceEnabled ? "RIYA Voice চালু ❤️" : "RIYA Voice বন্ধ",
+                            Toast.LENGTH_SHORT).show();
+                });
+            } catch (Exception error) {
+                android.util.Log.e("RIYA", "Voice setting save failed", error);
+                runOnUiThread(() -> Toast.makeText(this,
+                        "Voice setting Save হয়নি। BUBAI Server পরীক্ষা করো।",
+                        Toast.LENGTH_LONG).show());
+            } finally {
+                if (connection != null) connection.disconnect();
+                runOnUiThread(() -> {
+                    if (voiceButton != null) voiceButton.setEnabled(true);
+                });
+            }
+        }).start();
     }
 
     private void startVoiceInput() {
