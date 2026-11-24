@@ -51,17 +51,214 @@ public class MainActivity extends Activity {
     private SpeechRecognizer speechRecognizer;
     private boolean voiceEnabled = true;
     private static final int MIC_PERMISSION = 2002;
+    private static final String AUTH_PREFS = "riya_auth";
+    private String authToken = "";
+    private boolean authReady = false;
 
     @Override
     protected void onResume() {
         super.onResume();
-        syncVoiceSettingFromServer();
+        if (authReady && authToken != null && !authToken.isEmpty()) {
+            syncVoiceSettingFromServer();
+        }
     }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        checkOwnerAuth();
+    }
 
+
+    private void checkOwnerAuth() {
+        authToken = getSharedPreferences(AUTH_PREFS, MODE_PRIVATE)
+                .getString("session_token", "");
+
+        new Thread(() -> {
+            HttpURLConnection connection = null;
+            try {
+                URL url = new URL("http://127.0.0.1:8765/api/auth/status");
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("GET");
+                connection.setConnectTimeout(10000);
+                connection.setReadTimeout(10000);
+                if (authToken != null && !authToken.isEmpty()) {
+                    connection.setRequestProperty("Authorization", "Bearer " + authToken);
+                }
+
+                int status = connection.getResponseCode();
+                InputStream stream = status >= 200 && status < 300
+                        ? connection.getInputStream() : connection.getErrorStream();
+                StringBuilder response = new StringBuilder();
+                if (stream != null) {
+                    try (BufferedReader reader = new BufferedReader(
+                            new InputStreamReader(stream, "UTF-8"))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) response.append(line);
+                    }
+                }
+                if (status < 200 || status >= 300) {
+                    throw new Exception("HTTP " + status);
+                }
+
+                JSONObject data = new JSONObject(response.toString());
+                boolean authenticated = data.optBoolean("authenticated", false);
+                boolean setupRequired = data.optBoolean("setup_required", true);
+
+                runOnUiThread(() -> {
+                    if (authenticated) {
+                        authReady = true;
+                        buildMainUi();
+                    } else {
+                        authToken = "";
+                        showOwnerPasswordDialog(setupRequired);
+                    }
+                });
+            } catch (Exception error) {
+                android.util.Log.e("RIYA", "Owner auth status failed", error);
+                runOnUiThread(() -> new AlertDialog.Builder(this)
+                        .setTitle("BUBAI Server")
+                        .setMessage("Owner Login যাচাই করা যাচ্ছে না। Termux-এ BUBAI Dashboard server চালু করে আবার চেষ্টা করো।")
+                        .setCancelable(false)
+                        .setPositiveButton("আবার চেষ্টা", (d, w) -> checkOwnerAuth())
+                        .show());
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+        }).start();
+    }
+
+    private void showOwnerPasswordDialog(boolean setupRequired) {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(22), dp(12), dp(22), dp(4));
+
+        TextView message = new TextView(this);
+        message.setText(setupRequired
+                ? "প্রথমবার ব্যবহারের জন্য Owner Password তৈরি করো। কমপক্ষে ১০ অক্ষর।"
+                : "BUBAI AI Owner Account-এ Login করো।");
+        message.setTextColor(Color.WHITE);
+        message.setTextSize(15);
+        panel.addView(message);
+
+        EditText password = new EditText(this);
+        password.setSingleLine(true);
+        password.setTextColor(Color.WHITE);
+        password.setHintTextColor(0xFFB8B3CC);
+        password.setHint("Owner Password");
+        password.setInputType(129);
+        panel.addView(password);
+
+        EditText confirm = null;
+        if (setupRequired) {
+            confirm = new EditText(this);
+            confirm.setSingleLine(true);
+            confirm.setTextColor(Color.WHITE);
+            confirm.setHintTextColor(0xFFB8B3CC);
+            confirm.setHint("Confirm Password");
+            confirm.setInputType(129);
+            panel.addView(confirm);
+        }
+
+        final EditText confirmation = confirm;
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(setupRequired ? "Create Owner Account" : "Owner Login")
+                .setView(panel)
+                .setCancelable(false)
+                .setPositiveButton(setupRequired ? "Create Account" : "Login", null)
+                .create();
+
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(v -> {
+                    String pass = password.getText().toString();
+                    String confirmPass = confirmation == null
+                            ? pass : confirmation.getText().toString();
+
+                    if (pass.length() < 10 || pass.length() > 256) {
+                        password.setError("Password ১০–২৫৬ অক্ষরের হতে হবে");
+                        return;
+                    }
+                    if (!pass.equals(confirmPass)) {
+                        if (confirmation != null) confirmation.setError("Password মিলছে না");
+                        return;
+                    }
+
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
+                    submitOwnerPassword(pass, setupRequired, dialog);
+                }));
+        dialog.show();
+    }
+
+    private void submitOwnerPassword(String password, boolean setup, AlertDialog dialog) {
+        new Thread(() -> {
+            HttpURLConnection connection = null;
+            try {
+                String endpoint = setup ? "/api/auth/setup" : "/api/auth/login";
+                URL url = new URL("http://127.0.0.1:8765" + endpoint);
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("POST");
+                connection.setConnectTimeout(10000);
+                connection.setReadTimeout(15000);
+                connection.setDoOutput(true);
+                connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+
+                JSONObject request = new JSONObject();
+                request.put("password", password);
+                byte[] body = request.toString().getBytes("UTF-8");
+                connection.setFixedLengthStreamingMode(body.length);
+                try (OutputStream output = connection.getOutputStream()) {
+                    output.write(body);
+                }
+
+                int status = connection.getResponseCode();
+                InputStream stream = status >= 200 && status < 300
+                        ? connection.getInputStream() : connection.getErrorStream();
+                StringBuilder response = new StringBuilder();
+                if (stream != null) {
+                    try (BufferedReader reader = new BufferedReader(
+                            new InputStreamReader(stream, "UTF-8"))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) response.append(line);
+                    }
+                }
+                JSONObject result = new JSONObject(response.toString());
+                if (status < 200 || status >= 300) {
+                    throw new Exception(result.optString("error", "Login failed"));
+                }
+
+                String token = result.optString("token", "");
+                if (token.isEmpty()) throw new Exception("Server did not return a session token");
+
+                getSharedPreferences(AUTH_PREFS, MODE_PRIVATE).edit()
+                        .putString("session_token", token).apply();
+
+                runOnUiThread(() -> {
+                    authToken = token;
+                    authReady = true;
+                    dialog.dismiss();
+                    buildMainUi();
+                });
+            } catch (Exception error) {
+                android.util.Log.e("RIYA", "Owner login failed", error);
+                runOnUiThread(() -> {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true);
+                    Toast.makeText(this, error.getMessage(),
+                            Toast.LENGTH_LONG).show();
+                });
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+        }).start();
+    }
+
+    private void applyAuth(HttpURLConnection connection) {
+        if (authToken == null || authToken.isEmpty()) {
+            throw new IllegalStateException("Owner session is missing");
+        }
+        connection.setRequestProperty("Authorization", "Bearer " + authToken);
+    }
+
+    private void buildMainUi() {
         getWindow().setStatusBarColor(Color.rgb(15, 17, 38));
         getWindow().setNavigationBarColor(Color.rgb(15, 17, 38));
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
@@ -251,6 +448,7 @@ public class MainActivity extends Activity {
             try {
                 URL url = new URL("http://127.0.0.1:8765/api/riya/settings");
                 connection = (HttpURLConnection) url.openConnection();
+                applyAuth(connection);
                 connection.setRequestMethod("GET");
                 connection.setConnectTimeout(10000);
                 connection.setReadTimeout(10000);
@@ -301,6 +499,7 @@ public class MainActivity extends Activity {
             try {
                 URL url = new URL("http://127.0.0.1:8765/api/riya/settings");
                 connection = (HttpURLConnection) url.openConnection();
+                applyAuth(connection);
                 connection.setRequestMethod("POST");
                 connection.setConnectTimeout(10000);
                 connection.setReadTimeout(10000);
@@ -451,6 +650,7 @@ public class MainActivity extends Activity {
             try {
                 URL url = new URL("http://127.0.0.1:8765/api/riya/chat");
                 connection = (HttpURLConnection) url.openConnection();
+                applyAuth(connection);
                 connection.setRequestMethod("POST");
                 connection.setConnectTimeout(10000);
                 connection.setReadTimeout(60000);
@@ -522,6 +722,7 @@ public class MainActivity extends Activity {
             try {
                 URL url = new URL("http://127.0.0.1:8765/api/riya/settings");
                 connection = (HttpURLConnection) url.openConnection();
+                applyAuth(connection);
                 connection.setRequestMethod("GET");
                 connection.setConnectTimeout(10000);
                 connection.setReadTimeout(10000);
@@ -600,7 +801,52 @@ public class MainActivity extends Activity {
                     saveRiyaSettings(tokens, history);
                 })
                 .setNegativeButton("Cancel", null)
+                .setNeutralButton("Logout", (dialog, which) -> confirmOwnerLogout())
                 .show();
+    }
+
+    private void confirmOwnerLogout() {
+        new AlertDialog.Builder(this)
+                .setTitle("Owner Logout")
+                .setMessage("তুমি কি সত্যিই Owner Account থেকে Logout করতে চাও?")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Logout", (dialog, which) -> performOwnerLogout())
+                .show();
+    }
+
+    private void performOwnerLogout() {
+        new Thread(() -> {
+            HttpURLConnection connection = null;
+            boolean serverRevoked = false;
+            try {
+                URL url = new URL("http://127.0.0.1:8765/api/auth/logout");
+                connection = (HttpURLConnection) url.openConnection();
+                applyAuth(connection);
+                connection.setRequestMethod("POST");
+                connection.setConnectTimeout(10000);
+                connection.setReadTimeout(10000);
+                serverRevoked = connection.getResponseCode() >= 200
+                        && connection.getResponseCode() < 300;
+            } catch (Exception error) {
+                android.util.Log.e("RIYA", "Server logout failed", error);
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+
+            final boolean revoked = serverRevoked;
+            runOnUiThread(() -> {
+                authReady = false;
+                authToken = "";
+                getSharedPreferences(AUTH_PREFS, MODE_PRIVATE).edit()
+                        .remove("session_token").apply();
+                stopService(new Intent(this, FloatingService.class));
+                Toast.makeText(this,
+                        revoked ? "Owner Logout successful" :
+                                "Local Logout complete; server revoke could not be confirmed",
+                        Toast.LENGTH_LONG).show();
+                recreate();
+            });
+        }).start();
     }
 
     private void saveRiyaSettings(int tokens, int history) {
@@ -609,6 +855,7 @@ public class MainActivity extends Activity {
             try {
                 URL url = new URL("http://127.0.0.1:8765/api/riya/settings");
                 connection = (HttpURLConnection) url.openConnection();
+                applyAuth(connection);
                 connection.setRequestMethod("POST");
                 connection.setConnectTimeout(10000);
                 connection.setReadTimeout(10000);
@@ -678,6 +925,7 @@ public class MainActivity extends Activity {
             try {
                 URL url = new URL("http://127.0.0.1:8765/api/riya/settings");
                 connection = (HttpURLConnection) url.openConnection();
+                applyAuth(connection);
                 connection.setRequestMethod("POST");
                 connection.setConnectTimeout(10000);
                 connection.setReadTimeout(10000);
