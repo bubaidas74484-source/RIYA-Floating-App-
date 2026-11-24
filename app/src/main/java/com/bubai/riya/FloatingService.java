@@ -95,7 +95,7 @@ public class FloatingService extends Service {
                 new FrameLayout.LayoutParams(62, 39);
         mouthParams.leftMargin = 140;
         mouthParams.topMargin = 131;
-        // Mouth overlay temporarily disabled to protect original face.
+        avatarFrame.addView(mouth, mouthParams);
 
         idleAnimator = new RiyaIdleAnimator(avatar);
         speakingAnimator = new RiyaSpeakingAnimator(mouth);
